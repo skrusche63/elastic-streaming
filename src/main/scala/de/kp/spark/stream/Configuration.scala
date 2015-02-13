@@ -20,6 +20,8 @@ package de.kp.spark.stream
 
 object Configuration {
 
+  def datasift:Map[String,String] = null
+
   def elastic:Map[String,String] = null
 
   def kafka:Map[String,String] = null
