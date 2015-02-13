@@ -27,7 +27,7 @@ object Configuration {
   def kafka:Map[String,String] = null
   
   def kinesis:Map[String,String] = null
-
-  def stream:Map[String,String] = null
+  
+  def zeromq:Map[String,String] = null
   
 }

@@ -20,11 +20,13 @@ package de.kp.spark.stream
 
 import scala.util.parsing.json._
 
-import kafka.serializer.StringDecoder
+import akka.util.ByteString
+import akka.zeromq.Subscribe
+
 import org.apache.spark.SparkContext._
 
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.streaming.kafka._
+import org.apache.spark.streaming.zeromq._
 
 import org.apache.hadoop.conf.{Configuration => HConf}
 import org.apache.hadoop.io.{MapWritable,NullWritable,Text}
@@ -32,14 +34,16 @@ import org.apache.hadoop.io.{MapWritable,NullWritable,Text}
 import org.elasticsearch.hadoop.mr.EsOutputFormat
 
 /**
- * EsStream provides base functionality for indexing transformed live streams 
- * from Apache Kafka with Elasticsearch; to appy a customized transformation,
- * the method 'transform' must be overwritten
+ * The EsZeroMQ class can be used in combination with
+ * logstash and the respective ZMQ output; the benefit
+ * from this class is, that additional analysis can be
+ * applied to the stream before indexing the results 
+ * in an Elasticsearch cluster
  */
-class EsKafka(@transient ctx:RequestContext) extends Serializable {
+class EsZeroMQ(@transient ctx:RequestContext) extends Serializable {
   
   private val elasticSettings = ctx.config.elastic
-  private val kafkaSettings = ctx.config.kafka
+  private val zeromqSettings = ctx.config.zeromq
 
   def run(index:String,mapping:String) {
  
@@ -52,27 +56,20 @@ class EsKafka(@transient ctx:RequestContext) extends Serializable {
     elasticConfig.set("es.port", elasticSettings("es.port"))
     
     elasticConfig.set("es.resource", String.format("""%s/%s""",index,mapping)) 
- 
-  /* Kafka configuration */
-   val kafkaConfig = Map(
-      "group.id" -> kafkaSettings("kafka.group"),
-      
-      "zookeeper.connect" -> kafkaSettings("kafka.zklist"),
-      "zookeeper.connection.timeout.ms" -> kafkaSettings("kafka.timeout")
-    
-    )
 
-    val kafkaTopics = kafkaSettings("kafka.topics").split(",").map((_,kafkaSettings("kafka.threads").toInt)).toMap   
- 
     /*
-     * The KafkaInputDStream returns a Tuple where only the second component
-     * holds the respective message; we therefore reduce to a DStream[String]
+     * ZeroMQ configuration
      */
-    val stream = KafkaUtils.createStream[String,String,StringDecoder,StringDecoder](
-        ctx.streamingContext,
-        kafkaConfig,
-        kafkaTopics,StorageLevel.MEMORY_AND_DISK
-        ).map(_._2)
+    val endpointZMQ = zeromqSettings("zeromq.endpoint")
+    val topicZMQ = zeromqSettings("zeromq.topic")
+    
+    def bytesToStringIterator(x: Seq[ByteString]) = (x.map(_.utf8String)).iterator
+
+    val stream = ZeroMQUtils.createStream(
+        ctx.streamingContext, 
+        endpointZMQ, 
+        Subscribe(topicZMQ), 
+        bytesToStringIterator _)
     
     stream.foreachRDD(rdd => {
       val messages = rdd.map(prepare)
@@ -82,7 +79,7 @@ class EsKafka(@transient ctx:RequestContext) extends Serializable {
     /* Start the streaming context and await termination */
     ctx.streamingContext.start()
     ctx.streamingContext.awaitTermination()
-
+    
   }
   
   private def prepare(message:String):(Object,Object) = {
@@ -100,5 +97,5 @@ class EsKafka(@transient ctx:RequestContext) extends Serializable {
     (kw, vw)
     
   }
-
+  
 }

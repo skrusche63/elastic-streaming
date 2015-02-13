@@ -78,6 +78,13 @@
 	  <artifactId>spark-streaming-kinesis-asl_2.10</artifactId>
 	  <version>${spark.version}</version>
     </dependency>
+
+    <!-- spark streaming zeromq -->
+    <dependency>
+	  <groupId>org.apache.spark</groupId>
+	  <artifactId>spark-streaming-zeromq_2.10</artifactId>
+	  <version>${spark.version}</version>
+    </dependency>
     
    <!--  cascading (from conjars.org) -->
    
