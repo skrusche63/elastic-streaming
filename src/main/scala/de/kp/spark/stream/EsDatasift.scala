@@ -1,21 +1,29 @@
 package de.kp.spark.stream
-
-import scala.util.parsing.json._
-
-import kafka.serializer.StringDecoder
-import org.apache.spark.SparkContext._
+/* Copyright (c) 2014 Dr. Krusche & Partner PartG
+* 
+* This file is part of the Elastic-Streaming project
+* (https://github.com/skrusche63/elastic-streaming).
+* 
+* Elastic-Streaming is free software: you can redistribute it and/or modify it under the
+* terms of the GNU General Public License as published by the Free Software
+* Foundation, either version 3 of the License, or (at your option) any later
+* version.
+* 
+* Elastic-Streaming is distributed in the hope that it will be useful, but WITHOUT ANY
+* WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+* A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+* You should have received a copy of the GNU General Public License along with
+* Elastic-Streaming. 
+* 
+* If not, see <http://www.gnu.org/licenses/>.
+*/
 
 import org.apache.spark.storage.StorageLevel
 
 import org.apache.hadoop.conf.{Configuration => HConf}
-import org.apache.hadoop.io.{MapWritable,NullWritable,Text}
-
-import org.elasticsearch.hadoop.mr.EsOutputFormat
-
-import com.datasift.client.stream.Interaction
 import de.kp.spark.datasift.DatasiftUtils
 
-class EsDatasift(@transient ctx:RequestContext) extends Serializable {
+class EsDatasift(@transient ctx:RequestContext,analyzer:StreamAnalyzer) extends EsConnector {
 
   private val elasticSettings = ctx.config.elastic
   private val datasiftSettings = ctx.config.datasift
@@ -44,35 +52,17 @@ class EsDatasift(@transient ctx:RequestContext) extends Serializable {
       datasift_user,
       datasift_query,
       StorageLevel.MEMORY_AND_DISK
-      )
+      ).map(interaction => interaction.toString)
+       
+    val transformed = if (analyzer == null) stream else analyzer.analyze(stream)
     
-    stream.foreachRDD(rdd => {
-      val messages = rdd.map(prepare)
-      messages.saveAsNewAPIHadoopFile("-",classOf[NullWritable],classOf[MapWritable],classOf[EsOutputFormat],elasticConfig)          
-    })
+    /* Save to Elasticsearch */
+    saveToES(transformed,elasticConfig)
     
     /* Start the streaming context and await termination */
     ctx.streamingContext.start()
     ctx.streamingContext.awaitTermination()
 
-  }
-  
-  private def prepare(interaction:Interaction):(Object,Object) = {
-      
-    val message = interaction.toString()
-    
-    val m = JSON.parseFull(message) match {
-      case Some(map) => map.asInstanceOf[Map[String,String]]
-      case None => Map.empty[String,String]
-    }
-
-    val kw = NullWritable.get
-    
-    val vw = new MapWritable
-    for ((k, v) <- m) vw.put(new Text(k), new Text(v))
-    
-    (kw, vw)
-    
   }
   
 }

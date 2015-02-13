@@ -65,6 +65,13 @@
 
     </dependency>
 
+    <!--  twitter algebird -->
+    <dependency>
+	  <groupId>com.twitter</groupId>
+	  <artifactId>algebird-core_2.10</artifactId>
+	  <version>0.9.0</version>
+    </dependency> 
+ 
     <!-- spark streaming kafka -->
     <dependency>
 	  <groupId>org.apache.spark</groupId>
@@ -133,6 +140,13 @@
 	  <groupId>com.datasift.client</groupId>
 	  <artifactId>datasift-java</artifactId>
 	  <version>3.2.4</version>
+    </dependency>
+    
+    <!-- json4s -->
+    <dependency>
+	  <groupId>org.json4s</groupId>
+	  <artifactId>json4s-native_2.10</artifactId>
+	  <version>3.2.10</version>
     </dependency>
   
   </dependencies>

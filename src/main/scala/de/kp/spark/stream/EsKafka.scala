@@ -18,25 +18,18 @@ package de.kp.spark.stream
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import scala.util.parsing.json._
-
-import kafka.serializer.StringDecoder
-import org.apache.spark.SparkContext._
-
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.kafka._
 
+import kafka.serializer.StringDecoder
 import org.apache.hadoop.conf.{Configuration => HConf}
-import org.apache.hadoop.io.{MapWritable,NullWritable,Text}
-
-import org.elasticsearch.hadoop.mr.EsOutputFormat
 
 /**
  * EsStream provides base functionality for indexing transformed live streams 
  * from Apache Kafka with Elasticsearch; to appy a customized transformation,
  * the method 'transform' must be overwritten
  */
-class EsKafka(@transient ctx:RequestContext) extends Serializable {
+class EsKafka(@transient ctx:RequestContext,analyzer:StreamAnalyzer) extends EsConnector {
   
   private val elasticSettings = ctx.config.elastic
   private val kafkaSettings = ctx.config.kafka
@@ -73,32 +66,16 @@ class EsKafka(@transient ctx:RequestContext) extends Serializable {
         kafkaConfig,
         kafkaTopics,StorageLevel.MEMORY_AND_DISK
         ).map(_._2)
+       
+    val transformed = if (analyzer == null) stream else analyzer.analyze(stream)
     
-    stream.foreachRDD(rdd => {
-      val messages = rdd.map(prepare)
-      messages.saveAsNewAPIHadoopFile("-",classOf[NullWritable],classOf[MapWritable],classOf[EsOutputFormat],elasticConfig)          
-    })
-    
+    /* Save to Elasticsearch */
+    saveToES(transformed,elasticConfig)
+     
     /* Start the streaming context and await termination */
     ctx.streamingContext.start()
     ctx.streamingContext.awaitTermination()
 
-  }
-  
-  private def prepare(message:String):(Object,Object) = {
-      
-    val m = JSON.parseFull(message) match {
-      case Some(map) => map.asInstanceOf[Map[String,String]]
-      case None => Map.empty[String,String]
-    }
-
-    val kw = NullWritable.get
-    
-    val vw = new MapWritable
-    for ((k, v) <- m) vw.put(new Text(k), new Text(v))
-    
-    (kw, vw)
-    
   }
 
 }

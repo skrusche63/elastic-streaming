@@ -18,20 +18,13 @@ package de.kp.spark.stream
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-import scala.util.parsing.json._
-
 import akka.util.ByteString
 import akka.zeromq.Subscribe
-
-import org.apache.spark.SparkContext._
 
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.zeromq._
 
 import org.apache.hadoop.conf.{Configuration => HConf}
-import org.apache.hadoop.io.{MapWritable,NullWritable,Text}
-
-import org.elasticsearch.hadoop.mr.EsOutputFormat
 
 /**
  * The EsZeroMQ class can be used in combination with
@@ -40,7 +33,7 @@ import org.elasticsearch.hadoop.mr.EsOutputFormat
  * applied to the stream before indexing the results 
  * in an Elasticsearch cluster
  */
-class EsZeroMQ(@transient ctx:RequestContext) extends Serializable {
+class EsZeroMQ(@transient ctx:RequestContext,analyzer:StreamAnalyzer) extends EsConnector {
   
   private val elasticSettings = ctx.config.elastic
   private val zeromqSettings = ctx.config.zeromq
@@ -70,31 +63,15 @@ class EsZeroMQ(@transient ctx:RequestContext) extends Serializable {
         endpointZMQ, 
         Subscribe(topicZMQ), 
         bytesToStringIterator _)
+       
+    val transformed = if (analyzer == null) stream else analyzer.analyze(stream)
     
-    stream.foreachRDD(rdd => {
-      val messages = rdd.map(prepare)
-      messages.saveAsNewAPIHadoopFile("-",classOf[NullWritable],classOf[MapWritable],classOf[EsOutputFormat],elasticConfig)          
-    })
+    /* Save to Elasticsearch */
+    saveToES(transformed,elasticConfig)
     
     /* Start the streaming context and await termination */
     ctx.streamingContext.start()
     ctx.streamingContext.awaitTermination()
-    
-  }
-  
-  private def prepare(message:String):(Object,Object) = {
-      
-    val m = JSON.parseFull(message) match {
-      case Some(map) => map.asInstanceOf[Map[String,String]]
-      case None => Map.empty[String,String]
-    }
-
-    val kw = NullWritable.get
-    
-    val vw = new MapWritable
-    for ((k, v) <- m) vw.put(new Text(k), new Text(v))
-    
-    (kw, vw)
     
   }
   
