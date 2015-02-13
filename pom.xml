@@ -120,6 +120,13 @@
         </exclusion>
       </exclusions>  
     </dependency>    
+
+    <!-- datasift client 3.2.4 -->
+    <dependency>
+	  <groupId>com.datasift.client</groupId>
+	  <artifactId>datasift-java</artifactId>
+	  <version>3.2.4</version>
+    </dependency>
   
   </dependencies>
  
