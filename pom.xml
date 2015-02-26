@@ -148,6 +148,13 @@
 	  <artifactId>json4s-native_2.10</artifactId>
 	  <version>3.2.10</version>
     </dependency>
+
+    <!-- apache commoms pool2 -->
+    <dependency>
+	  <groupId>org.apache.commons</groupId>
+	  <artifactId>commons-pool2</artifactId>
+	  <version>2.3</version>
+    </dependency>
   
   </dependencies>
  
